@@ -1,6 +1,6 @@
 name: nfc
 synopsis: libnfc bindings
-version: '0.0.1'
+version: '0.1.0'
 license: PublicDomain
 maintainer: John Galt <jgalt@centromere.net>
 category: Bindings
