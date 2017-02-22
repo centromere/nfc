@@ -16,6 +16,9 @@ main = do
     Just d  -> do
       void $ initiatorInit d
       forever $ do
-        let nfcMod = NFCModulation NmtIso14443a Nbr106 
-        (_, NFCTargetISO14443a info) <- initiatorSelectPassiveTarget d nfcMod Nothing
-        C8.putStrLn $ encode $ iso14443aAbtUid info
+        let nfcMod = NFCModulation NmtIso14443a Nbr106
+        maybeTarget <- initiatorSelectPassiveTarget d nfcMod Nothing
+        -- OR: maybeTarget <- initiatorPollTarget d [nfcMod] 7 5
+        case maybeTarget of
+          Just (NFCTargetISO14443a info) -> C8.putStrLn . encode $ iso14443aAbtUid info
+          _ -> return ()

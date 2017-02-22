@@ -29,6 +29,7 @@ library:
     - Bindings.NFC
   extra-libraries:
     - nfc
+  c-sources: cbits/*
 
 executables:
   print-mifare-uid-forever:

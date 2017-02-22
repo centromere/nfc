@@ -13,12 +13,12 @@ module Bindings.NFC
   , initiatorPollTarget
   ) where
 
-import Control.Monad         ((>=>))
+import Control.Monad         ((<=<))
 import Data.ByteString       (ByteString, packCStringLen)
 import Data.Word             (Word8, Word16)
 import Foreign.C.String      (withCStringLen)
 import Foreign.C.Types       (CUChar(..))
-import Foreign.ForeignPtr    (newForeignPtr)
+import Foreign.ForeignPtr    (newForeignPtr, withForeignPtr)
 import Foreign.Ptr           (Ptr, castPtr, nullPtr)
 import Foreign.Marshal.Alloc (alloca)
 import Foreign.Marshal.Array (allocaArray, pokeArray)
@@ -41,7 +41,7 @@ data NFCISO14443aInfo =
 data NFCTarget = NFCTargetISO14443a NFCISO14443aInfo
 
 outNfcCtx :: Ptr (Ptr ()) -> IO NFCContextPtr
-outNfcCtx = peek >=> newForeignPtr nfc_exit
+outNfcCtx = newForeignPtr nfc_exit <=< peek
 
 outNfcDev :: Ptr () -> IO (Maybe NFCDevicePtr)
 outNfcDev = maybePeek $ newForeignPtr nfc_close
@@ -50,8 +50,8 @@ inMaybeStrLen :: Num a => Maybe String -> ((Ptr CUChar, a) -> IO b) -> IO b
 inMaybeStrLen Nothing    f = f (nullPtr, 0)
 inMaybeStrLen (Just str) f = withCStringLen str $ \(ptr, len) -> f (castPtr ptr, fromIntegral len)
 
-inNFCMod :: Num a => [NFCModulation] -> ((Ptr NFCModulation, a) -> IO b) -> IO b
-inNFCMod nfcMod f = do
+inNfcMod :: Num a => [NFCModulation] -> ((Ptr NFCModulation, a) -> IO b) -> IO b
+inNfcMod nfcMod f = do
   let len = length nfcMod
 
   allocaArray len $ \ptr -> do
@@ -60,6 +60,24 @@ inNFCMod nfcMod f = do
 
 #include "nfc/nfc.h"
 #include "nfc/nfc-types.h"
+
+#c
+
+nfc_modulation *hs_nfc_get_nm(nfc_target *t);
+size_t hs_nfc_target_size();
+uint8_t *hs_nfc_get_nai_abtAtqa(nfc_target *t);
+uint8_t  hs_nfc_get_nai_btSak(nfc_target *t);
+size_t   hs_nfc_get_nai_szUidLen(nfc_target *t);
+uint8_t *hs_nfc_get_nai_abtUid(nfc_target *t);
+size_t   hs_nfc_get_nai_szAtsLen(nfc_target *t);
+uint8_t *hs_nfc_get_nai_abtAts(nfc_target *t);
+int __wrapped__nfc_initiator_select_passive_target (nfc_device *,
+                                                    const nfc_modulation *,
+                                                    const uint8_t *,
+                                                    const size_t,
+                                                    nfc_target *);
+
+#endc
 
 {#enum nfc_modulation_type as NFCModulationType {underscoreToCase} deriving (Eq,Show)#}
 
@@ -79,29 +97,39 @@ inNFCMod nfcMod f = do
 
 {#fun nfc_initiator_init as initiatorInit {`NFCDevicePtr'} -> `Int'#}
 
-{#fun nfc_initiator_select_passive_target as initiatorSelectPassiveTarget
-{`NFCDevicePtr', with* %`NFCModulation', inMaybeStrLen* `Maybe String'&, alloca- `NFCTarget' peek*} -> `Int'#}
+initiatorSelectPassiveTarget :: NFCDevicePtr -> NFCModulation -> Maybe String -> IO (Maybe NFCTarget)
+initiatorSelectPassiveTarget dev nfcMod initData =
+  withForeignPtr dev $ \devPtr ->
+    with nfcMod $ \nfcModPtr ->
+      inMaybeStrLen initData $ \(strPtr, strLen) ->
+        alloca $ \target -> do
+          returnValue <- {#call __wrapped__nfc_initiator_select_passive_target#}
+                         devPtr
+                         nfcModPtr
+                         strPtr
+                         strLen
+                         target
 
-{#fun nfc_initiator_poll_target as initiatorPollTarget
-{`NFCDevicePtr', inNFCMod* `[NFCModulation]'&, `Word8', `Word8', alloca- `NFCTarget' peek*} -> `Int'#}
+          if returnValue /= 1
+            then return Nothing
+            else (return . Just <=< peek) target
 
-#c
+initiatorPollTarget :: NFCDevicePtr -> [NFCModulation] -> Word8 -> Word8 -> IO (Maybe NFCTarget)
+initiatorPollTarget dev nfcMod numPolling period = do
+  withForeignPtr dev $ \devPtr ->
+    inNfcMod nfcMod $ \(nfcModArray, nfcModLen) ->
+      alloca $ \target -> do
+        returnValue <- {#call nfc_initiator_poll_target#}
+                       devPtr
+                       nfcModArray
+                       nfcModLen
+                       (fromIntegral numPolling)
+                       (fromIntegral period)
+                       target
 
-/* These functions are needed because the libnfc author used #pragma pack(1).
- * c2hs does not recognize this compiler directive.
- */
-nfc_modulation *hs_nfc_get_nm(nfc_target *t) { return &t->nm; }
-
-size_t hs_nfc_target_size() { return sizeof(nfc_target); }
-
-uint8_t *hs_nfc_get_nai_abtAtqa(nfc_target *t)  { return t->nti.nai.abtAtqa;  }
-uint8_t  hs_nfc_get_nai_btSak(nfc_target *t)    { return t->nti.nai.btSak;    }
-size_t   hs_nfc_get_nai_szUidLen(nfc_target *t) { return t->nti.nai.szUidLen; }
-uint8_t *hs_nfc_get_nai_abtUid(nfc_target *t)   { return t->nti.nai.abtUid;   }
-size_t   hs_nfc_get_nai_szAtsLen(nfc_target *t) { return t->nti.nai.szAtsLen; }
-uint8_t *hs_nfc_get_nai_abtAts(nfc_target *t)   { return t->nti.nai.abtAts;   }
-
-#endc
+        if returnValue /= 1
+          then return Nothing
+          else (return . Just <=< peek) target
 
 decodeIso14443a :: Ptr NFCTarget -> IO NFCTarget
 decodeIso14443a p = do
