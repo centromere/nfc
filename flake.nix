@@ -34,14 +34,5 @@
         packages.${exampleName} = haskellPackages.${exampleName};
 
         defaultPackage = self.packages.${system}.${exampleName};
-
-        devShell = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            ghcid
-            cabal-install
-            haskellPackages.${packageName}
-          ];
-          inputsFrom = builtins.attrValues self.packages.${system};
-        };
       });
 }
