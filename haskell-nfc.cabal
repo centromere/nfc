@@ -16,23 +16,6 @@ library
 
   c-sources: cbits/NFC.c
 
-  extra-libraries:
-    nfc
+  extra-libraries: nfc
 
   default-language:    Haskell2010
-
-
--- executable print-mifare-uid-forever
---   main-is: print-mifare-uid-forever.hs
--- 
---   hs-source-dirs: examples
--- 
---   build-depends:       base <5
---     , base16-bytestring
---     , bytestring
---     , nfc
--- 
---   ghc-options:
---     -rtsopts
---     -threaded
---     -with-rtsopts=-N

@@ -1,0 +1,19 @@
+cabal-version:       2.4
+name:                print-mifare-uid-forever
+version:             0.1.0.0
+
+
+executable print-mifare-uid-forever
+  main-is: print-mifare-uid-forever.hs
+  
+  hs-source-dirs: .
+  
+  build-depends:       base <5
+    , base16-bytestring
+    , bytestring
+    , haskell-nfc
+  
+  ghc-options:
+    -rtsopts
+    -threaded
+    -with-rtsopts=-N
