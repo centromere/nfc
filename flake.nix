@@ -27,9 +27,6 @@
 
         haskellPackages = pkgs.haskellPackages;
 
-        jailbreakUnbreak = pkg:
-          pkgs.haskell.lib.doJailbreak (pkg.overrideAttrs (_: { meta = { }; }));
-
       in {
         overlays.default = overlay;
 
