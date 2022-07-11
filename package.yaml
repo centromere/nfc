@@ -1,7 +1,8 @@
 name: nfc
 synopsis: libnfc bindings
-version: '0.1.0'
+version: '0.1.1'
 license: PublicDomain
+author: John Galt <jgalt@centromere.net>
 maintainer: John Galt <jgalt@centromere.net>
 category: Bindings
 description: nfc is a set of bindings to libnfc
@@ -10,6 +11,9 @@ extra-source-files:
   - package.yaml
   - README.md
   - stack.yaml
+  - flake.lock
+  - flake.nix
+  - nix/nfc.nix
 ghc-options: -Wall
 github: centromere/nfc
 
@@ -27,8 +31,8 @@ library:
   build-tools: c2hs
   exposed-modules:
     - Bindings.NFC
-  extra-libraries:
-    - nfc
+  pkg-config-dependencies:
+    - libnfc
   c-sources: cbits/*
 
 executables:
